@@ -28,24 +28,39 @@ def pairwise_dist(X_test, X_train, metric, mode):
     if metric == "l2":
         if mode == "two_loops":
             # =============== TODO (students, REQUIRED) ===============
-
+            dists = np.empty((Nte, Ntr), dtype=np.float64)
+            for i in range(Nte):
+                for j in range(Ntr):
+                    diff = X_test[i] - X_train[j]
+                    dists[i, j] = np.sqrt(np.sum(diff * diff))
+            return dists
             # =========================================================
-            raise NotImplementedError("Implement L2 two_loops")
 
         elif mode == "no_loops":
             # =============== TODO (students, REQUIRED) ===============
-
+            test_sq = np.sum(X_test * X_test, axis=1, keepdims=True)
+            train_sq = np.sum(X_train * X_train, axis=1)[None, :]
+            squared_dists = test_sq + train_sq - 2.0 * (X_test @ X_train.T)
+            # Roundoff can make a theoretically nonnegative value negative.
+            return np.sqrt(np.maximum(squared_dists, 0.0))
             # =========================================================
-            raise NotImplementedError("Implement L2 no_loops")
 
         else:
             raise ValueError("Unknown mode for L2.")
 
     elif metric == "cosine":
         # =============== TODO (students, REQUIRED) ===============
-
+        test_norm = np.linalg.norm(X_test, axis=1, keepdims=True)
+        train_norm = np.linalg.norm(X_train, axis=1)[None, :]
+        denominators = test_norm * train_norm
+        # A zero vector has no direction; use similarity 0 (distance 1).
+        similarities = np.divide(
+            X_test @ X_train.T, denominators,
+            out=np.zeros((Nte, Ntr), dtype=np.float64),
+            where=denominators > 0.0,
+        )
+        return 1.0 - np.clip(similarities, -1.0, 1.0)
         # ================================================
-        raise NotImplementedError("cosine distance")
     else:
         raise ValueError("metric must be 'l2' or 'cosine'.")
 
@@ -70,9 +85,10 @@ def knn_predict(X_test, X_train, y_train, k, metric, mode):
         neighbors = y_train[idx]
 
         # =============== TODO (students, REQUIRED) ===============
-
+        labels, counts = np.unique(neighbors, return_counts=True)
+        # np.unique sorts labels, so the first maximum is the smallest tie.
+        y_pred[i] = labels[np.argmax(counts)]
         # ===========================================
-        raise NotImplementedError("Implement majority vote in knn_predict")
 
     return y_pred
 
@@ -88,9 +104,17 @@ def select_k_by_validation(X_train, y_train, X_val, y_val, ks: List[int], metric
     accs   : list of validation accuracies aligned with ks
     """
     # =============== TODO (students, REQUIRED) ===============
-
+    if len(ks) == 0:
+        raise ValueError("ks must contain at least one candidate.")
+    y_val = np.asarray(y_val).reshape(-1)
+    accs = []
+    for k in ks:
+        y_pred = knn_predict(X_val, X_train, y_train, k, metric, mode)
+        accs.append(float(np.mean(y_pred == y_val)))
+    # Keep accs in input order, but resolve accuracy ties by smallest k.
+    best_index = max(range(len(ks)), key=lambda i: (accs[i], -ks[i]))
+    return int(ks[best_index]), accs
     # =========================================================
-    raise NotImplementedError("Implement select_k_by_validation")
 
 
 def run_with_visualization(metric="l2", mode="no_loops"):
